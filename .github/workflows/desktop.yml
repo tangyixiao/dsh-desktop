@@ -1,0 +1,35 @@
+name: desktop
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['dsh-v*']
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.13.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: node --import tsx/esm scripts/desktop-stage.ts
+      - run: pnpm --filter @deepseek-ai/dsh-desktop build
+      - run: pnpm --filter @deepseek-ai/dsh-desktop exec electron-builder --config electron-builder.yml --win nsis dir
+      - shell: pwsh
+        run: |
+          Get-ChildItem apps/desktop/dist -File | Get-FileHash -Algorithm SHA256 | Format-Table | Out-File apps/desktop/dist/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dsh-desktop-windows-x64
+          path: apps/desktop/dist/*

@@ -355,7 +355,7 @@ describe('real Loader composition', () => {
       + '<script>(globalThis.__DSH_BOOT_READY__ ??= Promise.withResolvers()).resolve()</script>')
   })
 
-  it('fails the fiber when the port is already taken (fail-loud at activation)', { timeout: 60_000 }, async () => {
+  it('falls back to an OS-assigned port when the preferred port is already taken', { timeout: 60_000 }, async () => {
     const first = await loadComposition()
     const takenPort = first.webServer.port
     const firstRoot = root
@@ -363,14 +363,10 @@ describe('real Loader composition', () => {
 
     let second: Context | undefined
     try {
-      let failure: unknown
-      try {
-        await loadComposition(takenPort)
-      } catch (error) {
-        failure = error
-      }
+      await loadComposition(takenPort)
       second = context
-      expect(String(failure)).toMatch(/failed to apply loader entry.*EADDRINUSE/)
+      expect(second!.webServer.port).toBeGreaterThan(0)
+      expect(second!.webServer.port).not.toBe(takenPort)
     } finally {
       await second?.fiber.dispose()
       context = first

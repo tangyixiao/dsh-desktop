@@ -118,8 +118,10 @@ function createGzipMiddleware(config: ResolvedConfig): NodeMiddleware {
  * The browser HTTP carrier service. Activation listens immediately. Route
  * registration order does not affect requests because configured named routes
  * must be distinct, and the fallback handler answers anything not yet claimed
- * during startup with 404 until its owner registers. A listen failure rejects
- * initialization, and the boot process reports the failed fiber.
+ * during startup with 404 until its owner registers. If the preferred port is
+ * unavailable, activation retries once with an OS-assigned port so a stale
+ * process or a Windows excluded-port reservation does not take the whole app
+ * down.
  */
 export class WebServer extends Service {
   static Config: z<Config> = z.object({
@@ -289,15 +291,7 @@ export class WebServer extends Service {
       }
     })
 
-    await new Promise<void>((resolve, reject) => {
-      this.server.once('error', reject)
-      this.server.listen(this.config.port, this.config.host, () => {
-        this.server.off('error', reject)
-        this.server.on('error', (err) => { this.ctx.logger.error(err) })
-        this.listenedPort = (this.server.address() as AddressInfo).port
-        resolve()
-      })
-    })
+    await this.listenWithFallback()
 
     // Node does not include upgraded sockets in closeAllConnections(). The service
     // owns them with the other connections, so it tracks and destroys them explicitly.
@@ -312,6 +306,32 @@ export class WebServer extends Service {
       }))
       await Promise.all([serverClosed, ...upgradedClosed])
     }, 'webServer.listen')
+  }
+
+  /** Listen on the requested port, falling back to an OS-assigned port for
+   * the two common Windows failure modes (`EACCES` and `EADDRINUSE`). */
+  private async listenWithFallback(): Promise<void> {
+    const attempt = (port: number) => new Promise<void>((resolve, reject) => {
+      const onError = (error: NodeJS.ErrnoException) => {
+        this.server.off('error', onError)
+        reject(error)
+      }
+      this.server.once('error', onError)
+      this.server.listen(port, this.config.host, () => {
+        this.server.off('error', onError)
+        this.server.on('error', (error) => { this.ctx.logger.error(error) })
+        this.listenedPort = (this.server.address() as AddressInfo).port
+        resolve()
+      })
+    })
+
+    try {
+      await attempt(this.config.port)
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      if (this.config.port === 0 || (code !== 'EACCES' && code !== 'EADDRINUSE')) throw error
+      await attempt(0)
+    }
   }
 
   /** Longest-prefix-wins over the prefix table after an exact-table miss. */

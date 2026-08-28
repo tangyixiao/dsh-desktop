@@ -1,0 +1,20 @@
+appId: ai.deepseek.dsh
+productName: DSH Desktop
+asar: true
+directories:
+  output: dist
+files:
+  - lib/**
+  - package.json
+extraResources:
+  - from: dsh-runtime
+    to: dsh-runtime
+win:
+  target:
+    - nsis
+    - dir
+  artifactName: dsh-desktop-${version}-${arch}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true

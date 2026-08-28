@@ -1,0 +1,3 @@
+[submodule "plugins/dsh-liang-skin"]
+	path = plugins/dsh-liang-skin
+	url = https://github.com/kingOfSoySauce/dsh-liang-skin.git
