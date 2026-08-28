@@ -1,4 +1,4 @@
-import { cp, mkdir, readdir, rm } from 'node:fs/promises'
+import { cp, mkdir, readdir, realpath, rm } from 'node:fs/promises'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { join } from 'node:path'
@@ -17,7 +17,17 @@ const sourceScope = join(root, 'node_modules', '@deepseek-ai')
 const targetScope = join(stage, 'node_modules', '@deepseek-ai')
 await mkdir(targetScope, { recursive: true })
 for (const name of await readdir(sourceScope)) {
-  await cp(join(sourceScope, name), join(targetScope, name), { recursive: true, dereference: true })
+  const source = join(sourceScope, name)
+  const target = join(targetScope, name)
+  try {
+    // Deploy may already provide this package (sometimes as a link to the
+    // same workspace directory). Never recurse-copy an existing target.
+    await realpath(target)
+    continue
+  } catch {
+    // A package may be absent from deploy's peer graph; copy it below.
+  }
+  await cp(source, target, { recursive: true, dereference: true, force: true })
 }
 await cp(join(root, 'apps', 'web', 'dist'), join(stage, 'apps', 'web', 'dist'), { recursive: true })
 console.log(`staged dsh runtime at ${stage}`)
