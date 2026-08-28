@@ -31,7 +31,7 @@ jobs:
       - shell: pwsh
         run: |
           Get-ChildItem apps/desktop/dist -File | Get-FileHash -Algorithm SHA256 | Format-Table | Out-File apps/desktop/dist/SHA256SUMS.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dsh-desktop-windows-x64
           path: apps/desktop/dist/*
