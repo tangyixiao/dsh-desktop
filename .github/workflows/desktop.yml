@@ -1,9 +1,8 @@
 name: desktop
 
 on:
-  workflow_dispatch:
-  push:
-    tags: ['dsh-v*']
+  release:
+    types: [published]
 
 jobs:
   windows:
